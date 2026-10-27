@@ -200,6 +200,24 @@ def _as_cmap(spec: Any, *, background: str) -> Any:
     return cmap_from_white(spec)
 
 
+_HIDE_NA = {"hide", "none", "transparent"}
+
+
+def _na_kw(na_color: Any) -> dict[str, Any]:
+    """Translate ``na_color`` into ``render_shapes`` kwargs.
+
+    * ``"default"`` -> leave spatialdata-plot's default (light grey).
+    * ``None`` / ``"hide"`` / ``"transparent"`` -> fully transparent, so
+      shapes without a value are not drawn.
+    * Anything else -> used as the colour for NaN shapes (e.g. ``"gray"``).
+    """
+    if isinstance(na_color, str) and na_color == "default":
+        return {}
+    if na_color is None or (isinstance(na_color, str) and na_color.lower() in _HIDE_NA):
+        return {"na_color": "#00000000"}
+    return {"na_color": mcolors.to_hex(na_color, keep_alpha=True)}
+
+
 def _resolve_one_gene(var_names: Sequence[str], gene: str) -> str | None:
     if gene in var_names:
         return gene
@@ -1274,6 +1292,7 @@ def plot_gene_pair_boundaries(
     table_name: str = "table",
     dpi: int = 600,
     skip_existing: bool = True,
+    na_color: Any = "default",
 ) -> str:
     """Colour cell boundaries by gene 0 and nucleus boundaries by gene 1.
 
@@ -1300,6 +1319,11 @@ def plot_gene_pair_boundaries(
         Output resolution.
     skip_existing : bool, default True
         Skip rendering when the target PNG already exists.
+    na_color : color, None or ``"hide"``, default ``"default"``
+        Colour for shapes with no value (NaN), e.g. cells/nuclei missing from
+        the table after QC. ``"gray"`` paints them grey, ``None``/``"hide"``
+        makes them transparent, ``"default"`` keeps the spatialdata-plot
+        default.
 
     Returns
     -------
@@ -1325,12 +1349,14 @@ def plot_gene_pair_boundaries(
         return save_path
     (
         sdata.pl.render_shapes(
-            cell_shape_key, color=gene0, cmap=_as_cmap(color0, background="white")
+            cell_shape_key, color=gene0, cmap=_as_cmap(color0, background="white"),
+            **_na_kw(na_color),
         )
         .pl.render_shapes(
             nucleus_shape_key,
             color=gene1,
             cmap=_as_cmap(color1, background="white"),
+            **_na_kw(na_color),
         )
         .pl.show(dpi=dpi, save=save_path)
     )
@@ -1476,6 +1502,7 @@ def plot_gene_cell_nucleus(
     cell_shape_key: str = "cell_boundaries",
     nucleus_shape_key: str = "nucleus_boundaries",
     skip_existing: bool = True,
+    na_color: Any = "default",
 ) -> dict[str, str | None]:
     """Overlay gene 0 on cells and gene 1 on nuclei (gradient and/or binary).
 
@@ -1511,6 +1538,11 @@ def plot_gene_cell_nucleus(
         Shape elements to render.
     skip_existing : bool, default True
         Skip each PNG that already exists.
+    na_color : color, None or ``"hide"``, default ``"default"``
+        Colour for shapes with no value (NaN), e.g. cells/nuclei missing from
+        the table after QC. ``"gray"`` paints them grey, ``None``/``"hide"``
+        makes them transparent, ``"default"`` keeps the spatialdata-plot
+        default.
 
     Returns
     -------
@@ -1555,6 +1587,7 @@ def plot_gene_cell_nucleus(
                     table_name=cell_table,
                     fill_alpha=cell_alpha,
                     outline_alpha=outline_alpha,
+                    **_na_kw(na_color),
                 )
                 .pl.render_shapes(
                     nucleus_shape_key,
@@ -1563,6 +1596,7 @@ def plot_gene_cell_nucleus(
                     table_name=nucleus_table,
                     fill_alpha=nucleus_alpha,
                     outline_alpha=outline_alpha,
+                    **_na_kw(na_color),
                 )
                 .pl.show(
                     dpi=dpi,
@@ -1593,6 +1627,7 @@ def plot_gene_cell_nucleus(
                         table_name=cell_table,
                         fill_alpha=cell_alpha,
                         outline_alpha=outline_alpha,
+                        **_na_kw(na_color),
                     )
                     .pl.render_shapes(
                         nucleus_shape_key,
@@ -1601,6 +1636,7 @@ def plot_gene_cell_nucleus(
                         table_name=nucleus_table,
                         fill_alpha=nucleus_alpha,
                         outline_alpha=outline_alpha,
+                        **_na_kw(na_color),
                     )
                     .pl.show(
                         dpi=dpi,
@@ -1966,6 +2002,7 @@ def plot_gene_pairs_for_entries(
     dpi: int = 600,
     skip_existing: bool = True,
     skip_transcript_names: Sequence[str] = ("all",),
+    na_color: Any = "default",
 ) -> None:
     """Plot each gene pair for each entry.
 
@@ -1989,6 +2026,12 @@ def plot_gene_pairs_for_entries(
         Skip PNGs that already exist.
     skip_transcript_names : sequence of str, default ('all',)
         Crop names skipped when ``style='transcripts'``.
+    na_color : color, None or ``"hide"``, default ``"default"``
+        Used by the ``boundaries`` and ``cell_nucleus`` styles. Colour for
+        shapes with no value (NaN), e.g. cells/nuclei missing from
+        the table after QC. ``"gray"`` paints them grey, ``None``/``"hide"``
+        makes them transparent, ``"default"`` keeps the spatialdata-plot
+        default.
     """
     if style not in {"boundaries", "transcripts", "cell_nucleus"}:
         raise ValueError(
@@ -2011,6 +2054,7 @@ def plot_gene_pairs_for_entries(
                         name=name,
                         dpi=dpi,
                         skip_existing=skip_existing,
+                        na_color=na_color,
                     )
                 elif style == "transcripts":
                     plot_gene_pair_transcripts(
@@ -2035,6 +2079,7 @@ def plot_gene_pairs_for_entries(
                         mode=mode,
                         dpi=dpi,
                         skip_existing=skip_existing,
+                        na_color=na_color,
                     )
             except Exception as exc:
                 print(
